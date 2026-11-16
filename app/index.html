@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Города</title>
+</head>
+<body>
+    <h1>Игра "Города"</h1>
+    <p>Вы — игрок <b id="num">?</b></p>
+    <p>Город: <b id="city">—</b></p>
+    <p>Буква: <b id="let">—</b></p>
+    <p>Ход игрока: <b id="turn">—</b></p>
+    <p id="st">Подключение...</p>
+
+    <input id="inp" placeholder="Введите город" disabled>
+    <button id="send" disabled>Отправить</button>
+    <button id="surr">Сдаться</button>
+
+    <p id="err" style="color:red"></p>
+    <div id="log"></div>
+
+    <script>
+        const $ = id => document.getElementById(id);
+        const ws = new WebSocket('ws://127.0.0.1:8000/ws/game/');
+        let me = 0;
+
+        ws.onmessage = e => {
+            const d = JSON.parse(e.data);
+
+            if (d.type === 'init') {
+                me = d.num;
+                $('num').textContent = me;
+                $('city').textContent = d.city || '—';
+                $('turn').textContent = d.turn;
+                upd(d.turn);
+            }
+
+            if (d.type === 'city') {
+                $('city').textContent = d.city;
+                $('let').textContent = d.letter;
+                $('turn').textContent = d.turn;
+                log('Игрок ' + d.from + ': ' + d.city);
+                $('err').textContent = '';
+                upd(d.turn);
+            }
+
+            if (d.type === 'error') {
+                $('err').textContent = d.message;
+                setTimeout(() => $('err').textContent = '', 2500);
+            }
+
+            if (d.type === 'over') {
+                $('st').textContent = d.msg;
+                $('inp').disabled = $('send').disabled = true;
+                log(d.msg);
+            }
+        };
+
+        function upd(t) {
+            if (t == me) {
+                $('st').textContent = 'Ваш ход';
+                $('inp').disabled = $('send').disabled = false;
+                $('inp').focus();
+            } else {
+                $('st').textContent = 'Ждите хода соперника...';
+                $('inp').disabled = $('send').disabled = true;
+            }
+        }
+
+        function send() {
+            const v = $('inp').value.trim();
+            if (!v) return;
+            ws.send(JSON.stringify({action: 'city', city: v}));
+            $('inp').value = '';
+        }
+
+        $('send').onclick = send;
+        $('inp').onkeypress = e => { if (e.key === 'Enter') send(); };
+        $('surr').onclick = () => { if (confirm('Сдаться?')) ws.send(JSON.stringify({action: 'surrender'})); };
+
+        function log(t) {
+            const d = document.createElement('div');
+            d.textContent = t;
+            $('log').appendChild(d);
+        }
+    </script>
+</body>
+</html>
